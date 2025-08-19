@@ -12,6 +12,7 @@
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
 #include <poll.h>
+#include <cstdlib>
 #include <stdio.h>
 #include <time.h>
 // LED Pin - wiringPi pin 0 is BCM_GPIO 17.
@@ -39,8 +40,8 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-	system("airmon-ng start wlan0");
-	system("airodump-ng -c 1");
+	system("sudo airmon-ng start wlan0");
+	system("sudo airodump-ng -c 1");
 
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45,
 
@@ -134,7 +135,6 @@ int main() {
 	}
 
 	int re = 0;
-	int ret = 0;
 	int num_bytes = 0;
 	bool isOpen = false;
 
@@ -161,8 +161,8 @@ int main() {
 		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
 		{
 			ret = poll(&ttyPoll, 1, 100);
-// 			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
-// 			pcap_dispatch(handle, -1, pcapCallback, userHandle);
+ 			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
+ 			pcap_dispatch(handle, -1, pcapCallback, userHandle);
 		}
 		else
 		{
