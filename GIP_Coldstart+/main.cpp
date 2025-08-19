@@ -96,7 +96,7 @@ int main() {
 	struct stat SerialStat;
 	ttyPoll.fd = serial_port;
 	// Set up the poll structure
-	ttyPoll.events = POLLIN | POLLHUP; // POLLIN for input, POLLHUP for hangup
+	ttyPoll.events = POLLIN | POLLHUP | POLLOUT; // POLLIN for input, POLLHUP for hangup
 	// Read in existing settings, and handle any error
 	if (tcgetattr(serial_port, &tty) != 0) {
 		printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
@@ -139,7 +139,7 @@ int main() {
 	int ret = 0;
 	int num_bytes = 0;
 	bool isOpen = false;
-	printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+
 	signal(SIGHUP, SIG_IGN);
 	ret = poll(&ttyPoll, 1, 5000);
 
@@ -160,7 +160,7 @@ int main() {
 		// Read bytes. The behaviour of read() (e.g. does it block?,
 		// how long does it block for?) depends on the configuration
 		// settings above, specifically VMIN and VTIME
-		if ( !isOpen )
+		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
 		{
 			ret = poll(&ttyPoll, 1, 100);
 // 			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
@@ -168,13 +168,17 @@ int main() {
 		}
 		else
 		{
-			ret = poll(&ttyPoll, 1, 10);
+			ret = poll(&ttyPoll, 1, 500);
 		}
 		if (ttyPoll.revents & POLLHUP) {
 			close(serial_port);
 			serial_port = open("/dev/ttyGS0", O_RDWR);
+			isOpen = true;
 		}
-		int byteWritten = write(serial_port, &pwrStatus, sizeof(pwrStatus));
+
+		if (ttyPoll.revents & POLLOUT) {
+			write(serial_port, &pwrStatus, sizeof(pwrStatus));
+		}
 		if (ttyPoll.revents & POLLIN) {
 			unsigned short cmd = 0;
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
@@ -182,14 +186,11 @@ int main() {
 			{
 				isOpen = true;
 			}
-		}
-		else
-		{
-			if (isOpen)
+			else if (num_bytes == 0)
 			{
+				isOpen = false;
 				pwrStatus = PWR_STATUS_OTHER;
 			}
-			isOpen = false;
 		}
 	}
 
