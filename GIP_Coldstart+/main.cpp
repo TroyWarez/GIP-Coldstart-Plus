@@ -20,8 +20,8 @@
 // when choosing a different pin number please use the BCM numbering, also
 // update the Property Pages - Build Events - Remote Post-Build Event command
 // which uses gpio export for setup for wiringPiSetupSys
-#define	LED	17
-
+#define	LED	24
+#define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -32,16 +32,19 @@ static int pwrStatus = PWR_STATUS_OTHER;
 
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
 	if (packet[34] == 0x7e && packet[35] == 0xed) {
-		digitalWrite(LED, HIGH);  // On
-		delay(100); // ms
-		digitalWrite(LED, LOW);	  // Off
-		pwrStatus = PWR_STATUS_PI;
+		if(pwrStatus == PWR_STATUS_OTHER) {
+			pwrStatus = PWR_STATUS_PI;
+			digitalWrite(LED, HIGH);  // On
+			delay(100); // ms
+			digitalWrite(LED, LOW);	  // Off
+		}
+
 	}
 
 }
 int main() {
-	system("sudo airmon-ng start wlan0");
-	system("sudo airodump-ng -c 1");
+// 	system("sudo airmon-ng start wlan0");
+// 	system("sudo airodump-ng -c 1");
 
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45,
 
@@ -70,10 +73,15 @@ int main() {
 		1,
 		errbuf
 	);
-	if (handle == NULL) {
-		fprintf(stderr, "pcap_open_live() failed: %s\n", errbuf);
-		return 1;
-	}
+// 	while (handle == NULL) {
+// 		handle = pcap_open_live(
+// 			"wlan0mon",
+// 			BUFSIZ,
+// 			1,
+// 			1,
+// 			errbuf
+// 		);
+// 	}
 	wiringPiSetupSys();
 
 	pinMode(LED, OUTPUT);
@@ -81,7 +89,7 @@ int main() {
 
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
-	int serial_port = open("/dev/ttyGS0", O_RDWR);
+	int serial_port = open(TTY0_GS0, O_RDWR);
 	if (serial_port < 0) {
 		printf("Error %i from open: %s\n", errno, strerror(errno));
 		return 1;
@@ -143,7 +151,7 @@ int main() {
 
 	if (ttyPoll.revents & POLLHUP) {
 		close(serial_port);
-		serial_port = open("/dev/ttyGS0", O_RDWR);
+		serial_port = open(TTY0_GS0, O_RDWR);
 	}
 	if (ttyPoll.revents & POLLIN) {
 		unsigned short cmd = 0;
@@ -161,8 +169,8 @@ int main() {
 		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
 		{
 			ret = poll(&ttyPoll, 1, 100);
- 			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
- 			pcap_dispatch(handle, -1, pcapCallback, userHandle);
+//  			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
+//  			pcap_dispatch(handle, -1, pcapCallback, userHandle);
 		}
 		else
 		{
@@ -170,7 +178,7 @@ int main() {
 		}
 		if (ttyPoll.revents & POLLHUP) {
 			close(serial_port);
-			serial_port = open("/dev/ttyGS0", O_RDWR);
+			serial_port = open(TTY0_GS0, O_RDWR);
 			isOpen = true;
 		}
 
@@ -184,7 +192,16 @@ int main() {
 			{
 				isOpen = true;
 			}
-			else if (num_bytes == 0)
+		}
+		else if (ttyPoll.revents == 0)
+		{
+			unsigned short cmd = 0;
+			num_bytes = read(serial_port, &cmd, sizeof(cmd));
+			if (num_bytes > 0 && cmd == TTY0_GS0_POLL)
+			{
+				isOpen = true;
+			}
+			else if(isOpen)
 			{
 				isOpen = false;
 				pwrStatus = PWR_STATUS_OTHER;
