@@ -71,7 +71,7 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>
-      <LibraryDependencies>lirc;pcap;wiringPi</LibraryDependencies>
+      <LibraryDependencies>pcap;wiringPi</LibraryDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">

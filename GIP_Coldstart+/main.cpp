@@ -20,8 +20,16 @@
 // when choosing a different pin number please use the BCM numbering, also
 // update the Property Pages - Build Events - Remote Post-Build Event command
 // which uses gpio export for setup for wiringPiSetupSys
+
+//Start up Script:
+// # bash
+// airmon-ng start wlan0
+// airodump-ng -c 1 wlan0mon & pid = $!
+// sleep 5
+// kill $pid
+// /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
 #define	LED	24
-#define TTY0_GS0 "/dev/ttyGS0"
+#define TTY0_GS0 "/dev/ttyAMA0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -43,17 +51,14 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-// 	system("sudo airmon-ng start wlan0");
-// 	system("sudo airodump-ng -c 1");
-
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45,
 
-		//Change these to your own values from "airodump-ng -c 1" every dongle mac address starts with 62:45
+		//Change these to your own values from "airodump-ng -c 1 wlan0mon" every dongle mac address starts with 62:45
 		0xff, 0xff, 0xff, 0xff,
 
 		0x62, 0x45,
 
-		//Change these to your own values from "airodump-ng -c 1" every dongle mac address starts with 62:45
+		//Change these to your own values from "airodump-ng -c 1 wlan0mon" every dongle mac address starts with 62:45
 		0xff, 0xff, 0xff, 0xff,
 
 		0xc0, 0xe9, 0x2f, 0x9f, 0xc2, 0x16, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x31, 0xc6, 0x0, 0x0, 0xdd, 0xc, 0x0, 0x50, 0xf2, 0x11, 0x1, 0x10, 0x0, 0xa1, 0x28, 0x9d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
@@ -73,15 +78,15 @@ int main() {
 		1,
 		errbuf
 	);
-// 	while (handle == NULL) {
-// 		handle = pcap_open_live(
-// 			"wlan0mon",
-// 			BUFSIZ,
-// 			1,
-// 			1,
-// 			errbuf
-// 		);
-// 	}
+	while (handle == NULL) {
+		handle = pcap_open_live(
+			"wlan0mon",
+			BUFSIZ,
+			1,
+			1,
+			errbuf
+		);
+	}
 	wiringPiSetupSys();
 
 	pinMode(LED, OUTPUT);
@@ -169,8 +174,12 @@ int main() {
 		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
 		{
 			ret = poll(&ttyPoll, 1, 100);
-//  			ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
-//  			pcap_dispatch(handle, -1, pcapCallback, userHandle);
+			if (handle)
+			{
+				ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
+				pcap_dispatch(handle, -1, pcapCallback, userHandle);
+			}
+
 		}
 		else
 		{
@@ -188,7 +197,7 @@ int main() {
 		if (ttyPoll.revents & POLLIN) {
 			unsigned short cmd = 0;
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
-			if (num_bytes > 0 && cmd == TTY0_GS0_POLL)
+			if (num_bytes > 0 && cmd == TTY0_GS0_POLL && !isOpen)
 			{
 				isOpen = true;
 			}
