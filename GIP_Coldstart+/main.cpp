@@ -29,7 +29,7 @@
 // kill $pid
 // /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
 #define	LED	24
-#define TTY0_GS0 "/dev/ttyAMA0"
+#define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
