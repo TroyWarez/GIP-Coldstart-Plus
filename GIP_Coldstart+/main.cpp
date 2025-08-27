@@ -1,3 +1,4 @@
+#include <lirc/lirc_client.h>
 #include <wiringPi.h>
 #include <pcap/pcap.h>
 #include <errno.h>
@@ -29,6 +30,8 @@
 // kill $pid
 // /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
 #define	LED	24
+#define	IR_PWR	17
+#define	IR_TX	27
 #define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
@@ -51,6 +54,24 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
+
+	wiringPiSetupSys();
+	pinMode(LED, OUTPUT);
+	pinMode(IR_TX, OUTPUT);
+	pinMode(IR_PWR, OUTPUT);
+	while (true) {
+
+
+		digitalWrite(IR_PWR, HIGH);  // On
+
+		digitalWrite(IR_TX, HIGH);  // On
+		delay(500); // ms
+		digitalWrite(IR_PWR, LOW);  // On
+
+		digitalWrite(IR_TX, LOW);  // On
+	}
+
+	return 0;
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45,
 
 		//Change these to your own values from "airodump-ng -c 1 wlan0mon" every dongle mac address starts with 62:45
@@ -90,8 +111,10 @@ int main() {
 	wiringPiSetupSys();
 
 	pinMode(LED, OUTPUT);
-
-
+	pinMode(IR_PWR, OUTPUT);
+	digitalWrite(IR_PWR, HIGH);  // On
+	pinMode(IR_TX, OUTPUT);
+	digitalWrite(IR_PWR, HIGH);  // On
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 	int serial_port = open(TTY0_GS0, O_RDWR);
