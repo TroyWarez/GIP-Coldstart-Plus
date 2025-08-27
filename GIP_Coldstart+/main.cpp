@@ -54,6 +54,7 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
+	int a2 = lirc_init("irexec", 1);
 
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
