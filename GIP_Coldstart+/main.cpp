@@ -55,24 +55,27 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 }
 int main() {
 	int a2 = lirc_init("irexec", 1);
+	int fd;
 
+	fd = lirc_get_local_socket(NULL, 0);
+	//int a3 = lirc_send_one(fd, "BOSE-SB2", "KEY_POWER"); // Power code for GIP remote
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
 	pinMode(IR_TX, OUTPUT);
 	pinMode(IR_PWR, OUTPUT);
-	while (true) {
-
-
-		digitalWrite(IR_PWR, HIGH);  // On
-
-		digitalWrite(IR_TX, HIGH);  // On
-		delay(500); // ms
-		digitalWrite(IR_PWR, LOW);  // On
-
-		digitalWrite(IR_TX, LOW);  // On
-	}
-
-	return 0;
+// 	while (true) {
+// 
+// 
+// 		digitalWrite(IR_PWR, HIGH);  // On
+// 
+// 		digitalWrite(IR_TX, HIGH);  // On
+// 		delay(500); // ms
+// 		digitalWrite(IR_PWR, LOW);  // On
+// 
+// 		digitalWrite(IR_TX, LOW);  // On
+// 	}
+// 
+// 	return 0;
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45,
 
 		//Change these to your own values from "airodump-ng -c 1 wlan0mon" every dongle mac address starts with 62:45
@@ -120,12 +123,11 @@ int main() {
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 	int serial_port = open(TTY0_GS0, O_RDWR);
 	if (serial_port < 0) {
-		printf("Error %i from open: %s\n", errno, strerror(errno));
+		//printf("Error %i from open: %s\n", errno, strerror(errno));
 		return 1;
 	}
 	int serial = 0;
 	int bytes2 = 0;
-	printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
 	// Create new termios struct, we call it 'tty' for convention
 	struct termios tty;
 	struct pollfd  ttyPoll;
@@ -135,7 +137,7 @@ int main() {
 	ttyPoll.events = POLLIN | POLLHUP | POLLOUT; // POLLIN for input, POLLHUP for hangup
 	// Read in existing settings, and handle any error
 	if (tcgetattr(serial_port, &tty) != 0) {
-		printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
+		//printf("Error %i from tcgetattr: %s\n", errno, strerror(errno));
 		return 1;
 	}
 	tty.c_cflag &= ~PARENB; // Clear parity bit, disabling parity (most common)
@@ -167,7 +169,7 @@ int main() {
 
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
-		printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
+		//printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
 		return 1;
 	}
 
@@ -190,6 +192,8 @@ int main() {
 			isOpen = true;
 		}
 	}
+
+	unsigned short cmd = 0;
 	while (true)
 	{
 		// Read bytes. The behaviour of read() (e.g. does it block?,
@@ -197,13 +201,12 @@ int main() {
 		// settings above, specifically VMIN and VTIME
 		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
 		{
-			ret = poll(&ttyPoll, 1, 100);
 			if (handle)
 			{
 				ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
 				pcap_dispatch(handle, -1, pcapCallback, userHandle);
 			}
-
+			ret = poll(&ttyPoll, 1, 100);
 		}
 		else
 		{
@@ -212,33 +215,25 @@ int main() {
 		if (ttyPoll.revents & POLLHUP) {
 			close(serial_port);
 			serial_port = open(TTY0_GS0, O_RDWR);
-			isOpen = true;
 		}
 
 		if (ttyPoll.revents & POLLOUT) {
 			write(serial_port, &pwrStatus, sizeof(pwrStatus));
 		}
 		if (ttyPoll.revents & POLLIN) {
-			unsigned short cmd = 0;
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
 			if (num_bytes > 0 && cmd == TTY0_GS0_POLL && !isOpen)
 			{
 				isOpen = true;
-			}
-		}
-		else if (ttyPoll.revents == 0)
-		{
-			unsigned short cmd = 0;
-			num_bytes = read(serial_port, &cmd, sizeof(cmd));
-			if (num_bytes > 0 && cmd == TTY0_GS0_POLL)
-			{
-				isOpen = true;
-			}
-			else if(isOpen)
-			{
-				isOpen = false;
 				pwrStatus = PWR_STATUS_OTHER;
 			}
+		}
+		else if (ttyPoll.revents == 0 && isOpen) {
+			ret = poll(&ttyPoll, 1, 3000);
+			if (!(ttyPoll.revents & POLLIN)) {
+				isOpen = false;
+			}
+
 		}
 	}
 
