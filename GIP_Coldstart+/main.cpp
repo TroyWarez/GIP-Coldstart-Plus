@@ -9,7 +9,6 @@
 #include <string.h>
 #include <signal.h>
 #include <fcntl.h> // Contains file controls like O_RDWR
-#include <errno.h> // Error integer and strerror() function
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
 #include <poll.h>
@@ -36,11 +35,13 @@
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
-#define TTY0_GS0_POLL 0x00af
+// GIP Commands
+#define TTY0_GIP_POLL 0x00af
+#define TTY0_GIP_SYNC 0x00b0
+#define TTY0_GIP_CLEAR 0x00b1
+#define TTY0_GIP_LOCK 0x00b2
 
-static const unsigned char AllowControllerArrayList[1][6] = { // Must be updated with your controller MAC address
-	{ 0x7e, 0xed, 0xff, 0xff, 0xff, 0xff }
-};
+static const unsigned char AllowControllerArrayList[1][6] = { }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
 
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
@@ -180,7 +181,7 @@ int main() {
 	if (ttyPoll.revents & POLLIN) {
 		unsigned short cmd = 0;
 		num_bytes = read(serial_port, &cmd, sizeof(cmd));
-		if (num_bytes > 0 && cmd == TTY0_GS0_POLL)
+		if (num_bytes > 0 && cmd == TTY0_GIP_POLL)
 		{
 			isOpen = true;
 		}
@@ -215,7 +216,7 @@ int main() {
 		}
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
-			if (num_bytes > 0 && cmd == TTY0_GS0_POLL && !isOpen)
+			if (num_bytes > 0 && cmd == TTY0_GIP_POLL && !isOpen)
 			{
 				isOpen = true;
 				pwrStatus = PWR_STATUS_OTHER;
