@@ -29,6 +29,7 @@
 // kill $pid
 // /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
 #define	LED	24
+#define	PI_LED	27
 #define	IR_PWR	17
 #define	IR_TX	27
 #define TTY0_GS0 "/dev/ttyGS0"
@@ -41,12 +42,13 @@
 #define TTY0_GIP_CLEAR 0x00b1
 #define TTY0_GIP_LOCK 0x00b2
 
-static const unsigned char AllowControllerArrayList[1][6] = { }; // TO DO: Populate controller list and save to file.
+static unsigned char AllowControllerArrayList[1][6] = { }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
+static int lockStatus = 0;
 
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
 	if (memcmp(&packet[34], &AllowControllerArrayList[0][0], sizeof(AllowControllerArrayList)) == 0) {
-		if(pwrStatus == PWR_STATUS_OTHER) {
+		if(!lockStatus && pwrStatus == PWR_STATUS_OTHER) {
 			pwrStatus = PWR_STATUS_PI;
 			digitalWrite(LED, HIGH);  // On
 			delay(100); // ms
@@ -57,10 +59,10 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-	int a2 = lirc_init("irexec", 1);
-	int fd;
+	//int a2 = lirc_init("irexec", 1);
+	int fd = -1;
 
-	fd = lirc_get_local_socket(NULL, 0);
+	//fd = lirc_get_local_socket(NULL, 0);
 	//int a3 = lirc_send_one(fd, "BOSE-SB2", "KEY_POWER"); // Power code for GIP remote
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
@@ -181,9 +183,40 @@ int main() {
 	if (ttyPoll.revents & POLLIN) {
 		unsigned short cmd = 0;
 		num_bytes = read(serial_port, &cmd, sizeof(cmd));
-		if (num_bytes > 0 && cmd == TTY0_GIP_POLL)
+		if (num_bytes > 0)
 		{
 			isOpen = true;
+			switch (cmd)
+			{
+			case TTY0_GIP_POLL:
+			{
+				lockStatus = 0;
+				break;
+			}
+
+			case TTY0_GIP_SYNC:
+			{
+				lockStatus = 1;
+				break;
+			}
+			case TTY0_GIP_CLEAR:
+			{
+				lockStatus = 0;
+				memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+				break;
+			}
+			case TTY0_GIP_LOCK:
+			{
+				lockStatus = 1;
+				break;
+			}
+			default: 
+			{
+				isOpen = false;
+				break;
+			}
+			}
+
 		}
 	}
 
@@ -216,10 +249,27 @@ int main() {
 		}
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
-			if (num_bytes > 0 && cmd == TTY0_GIP_POLL && !isOpen)
+			if (num_bytes > 0 && !isOpen)
 			{
 				isOpen = true;
 				pwrStatus = PWR_STATUS_OTHER;
+				switch (cmd)
+				{
+				case TTY0_GIP_POLL:
+				{
+					break;
+				}
+				case TTY0_GIP_SYNC:
+				{
+					digitalWrite(LED, HIGH);  // On
+					delay(100); // ms
+					digitalWrite(LED, LOW);	  // Off
+					break;
+				}
+				{
+					break;
+				}
+				} 
 			}
 		}
 		else if (ttyPoll.revents == 0 && isOpen) {
