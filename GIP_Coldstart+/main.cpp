@@ -35,20 +35,55 @@
 #define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
+#define CONTROLLER_ARRAY_SIZE 1024
 
 // GIP Commands
 #define TTY0_GIP_POLL 0x00af
 #define TTY0_GIP_SYNC 0x00b0
 #define TTY0_GIP_CLEAR 0x00b1
 #define TTY0_GIP_LOCK 0x00b2
+#define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0x00b3
 
-static unsigned char AllowControllerArrayList[1][6] = { }; // TO DO: Populate controller list and save to file.
+static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][6] = { 0x00 }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
 static int lockStatus = 0;
-
+static int syncMode = 0;
+static int controllerCount = 0;
+int GetControllerCount()
+{
+	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
+		if (AllowControllerArrayList[i][0] == 0x00) {
+			return i;
+		}
+	}
+}
+bool IsControllerAllowed(const u_char* mac) {
+	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
+		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0) {
+			return true;
+		}
+		else if (AllowControllerArrayList[i][0] == 0x00) {
+			return false;
+		}
+	}
+	return false;
+}
+int AddController(const u_char* mac) { // Return new controller count
+	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
+		if (AllowControllerArrayList[i][0] == 0x00) {
+			memcpy(&AllowControllerArrayList[i][0], &mac[0], 6);
+			return GetControllerCount();
+		}
+	}
+}
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
-	if (memcmp(&packet[34], &AllowControllerArrayList[0][0], sizeof(AllowControllerArrayList)) == 0) {
-		if(!lockStatus && pwrStatus == PWR_STATUS_OTHER) {
+	if ( h->caplen >= 40) {
+		if ( packet[34] == 0x7e && packet[35] == 0xed && syncMode && !IsControllerAllowed(&packet[34])) {
+			syncMode = false;
+			controllerCount = AddController(&packet[34]);
+
+		}
+		else if(!lockStatus && pwrStatus == PWR_STATUS_OTHER && !syncMode && IsControllerAllowed(&packet[34])) {
 			pwrStatus = PWR_STATUS_PI;
 			digitalWrite(LED, HIGH);  // On
 			delay(100); // ms
@@ -196,7 +231,13 @@ int main() {
 
 			case TTY0_GIP_SYNC:
 			{
-				lockStatus = 1;
+				syncMode = true;
+				break;
+			}
+			case TTY0_GIP_SYNCED_CONTROLLER_COUNT:
+			{
+				controllerCount = GetControllerCount();
+				write(serial_port, &controllerCount, sizeof(controllerCount));
 				break;
 			}
 			case TTY0_GIP_CLEAR:
