@@ -71,12 +71,12 @@
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>
-      <LibraryDependencies>lirc_client;pcap;wiringPi</LibraryDependencies>
+      <LibraryDependencies>pcap;wiringPi</LibraryDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Link>
-      <LibraryDependencies>lirc_client;pcap;wiringPi</LibraryDependencies>
+      <LibraryDependencies>pcap;wiringPi</LibraryDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
