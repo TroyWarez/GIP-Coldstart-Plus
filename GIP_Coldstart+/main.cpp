@@ -46,10 +46,10 @@
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
-static int lockStatus = 0;
-static int syncMode = 0;
-static int clearMode = 0;
-static int controllerCount = 0;
+static int lockStatus = false;
+static int syncMode = false;
+static int clearMode = false;
+static int controllerCount = false;
 int GetControllerCount()
 {
 	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
@@ -268,7 +268,7 @@ int main() {
 			{
 			case TTY0_GIP_POLL:
 			{
-				lockStatus = 0;
+				lockStatus = false;
 				break;
 			}
 
@@ -285,7 +285,8 @@ int main() {
 			}
 			case TTY0_GIP_CLEAR: //Untested
 			{
-				lockStatus = 0;
+				lockStatus = false;
+				remove("/boot/allowed_controllers.txt");
 				memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 				controllerCount = GetControllerCount();
 				break;
@@ -297,7 +298,7 @@ int main() {
 			}
 			case TTY0_GIP_LOCK: //Untested
 			{
-				lockStatus = 1;
+				lockStatus = true;
 				break;
 			}
 			default: 
