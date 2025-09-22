@@ -110,6 +110,7 @@ void loadControllerListFromFile()
 	FILE* fp;
 	fp = fopen("/root/projects/GIP_Coldstart+/bin/ARM64/Release/allowed_controllers.txt", "r");
 	if (fp != NULL) {
+		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 		char line[18];
 		int index = 0;
 		while (fgets(line, sizeof(line), fp) != NULL && index < CONTROLLER_ARRAY_SIZE) {
