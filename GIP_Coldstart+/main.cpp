@@ -26,7 +26,7 @@
 // airodump-ng -c 1 wlan0mon & pid = $!
 // sleep 5
 // kill $pid
-// /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
+// /boot/./GIP_Coldstart+.out
 #define	LED	24
 #define	PI_LED	27
 #define TTY0_GS0 "/dev/ttyGS0"
@@ -92,7 +92,7 @@ int RemoveController(const u_char* mac) { // Return new controller count
 void saveControllerListToFile()
 {
 	FILE* fp;
-	fp = fopen("/root/projects/GIP_Coldstart+/bin/ARM64/Release/allowed_controllers.txt", "w");
+	fp = fopen("/boot/allowed_controllers.txt", "w");
 	if (fp != NULL) {
 		for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
 			if (AllowControllerArrayList[i][0] != 0x00) {
@@ -108,7 +108,7 @@ void saveControllerListToFile()
 void loadControllerListFromFile()
 {
 	FILE* fp;
-	fp = fopen("/root/projects/GIP_Coldstart+/bin/ARM64/Release/allowed_controllers.txt", "r");
+	fp = fopen("/boot/allowed_controllers.txt", "r");
 	if (fp != NULL) {
 		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 		char line[18];
