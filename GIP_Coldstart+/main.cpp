@@ -29,12 +29,12 @@
 // /root/projects/GIP_Coldstart+/bin/ARM64/Release/./GIP_Coldstart+.out
 #define	LED	24
 #define	PI_LED	27
-#define	IR_PWR	17
-#define	IR_TX	27
 #define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
+
 #define CONTROLLER_ARRAY_SIZE 1024
+#define CONTROLLER_MAC_ADDRESS_SIZE 6
 
 // GIP Commands
 #define TTY0_GIP_POLL 0x00af
@@ -42,11 +42,13 @@
 #define TTY0_GIP_CLEAR 0x00b1
 #define TTY0_GIP_LOCK 0x00b2
 #define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0x00b3
+#define TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER 0x00b4
 
-static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][6] = { 0x00 }; // TO DO: Populate controller list and save to file.
+static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
 static int lockStatus = 0;
 static int syncMode = 0;
+static int clearMode = 0;
 static int controllerCount = 0;
 int GetControllerCount()
 {
@@ -75,18 +77,80 @@ int AddController(const u_char* mac) { // Return new controller count
 		}
 	}
 }
+int RemoveController(const u_char* mac) { // Return new controller count
+	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
+		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0) {
+			memset(&AllowControllerArrayList[i][0], 0, 6);
+			break;
+		}
+		else if (AllowControllerArrayList[i][0] == 0x00) {
+			break;
+		}
+	}
+	return GetControllerCount();
+}
+void saveControllerListToFile()
+{
+	FILE* fp;
+	fp = fopen("/root/projects/GIP_Coldstart+/bin/ARM64/Release/allowed_controllers.txt", "w");
+	if (fp != NULL) {
+		for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
+			if (AllowControllerArrayList[i][0] != 0x00) {
+				fprintf(fp, "%02x:%02x:%02x:%02x:%02x:%02x\n", AllowControllerArrayList[i][0], AllowControllerArrayList[i][1], AllowControllerArrayList[i][2], AllowControllerArrayList[i][3], AllowControllerArrayList[i][4], AllowControllerArrayList[i][5]);
+			}
+			else {
+				break;
+			}
+		}
+		fclose(fp);
+	}
+}
+void loadControllerListFromFile()
+{
+	FILE* fp;
+	fp = fopen("/root/projects/GIP_Coldstart+/bin/ARM64/Release/allowed_controllers.txt", "r");
+	if (fp != NULL) {
+		char line[18];
+		int index = 0;
+		while (fgets(line, sizeof(line), fp) != NULL && index < CONTROLLER_ARRAY_SIZE) {
+			unsigned int mac[6] = { 0 };
+			if (sscanf(line, "%02x:%02x:%02x:%02x:%02x:%02x", &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]) == 6) {
+				for (int j = 0; j < 6; j++) {
+					AllowControllerArrayList[index][j] = (unsigned char)mac[j];
+				}
+				index++;
+			}
+		}
+		fclose(fp);
+	}
+}
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
 	if ( h->caplen >= 40) {
-		if ( packet[34] == 0x7e && packet[35] == 0xed && syncMode && !IsControllerAllowed(&packet[34])) {
-			syncMode = false;
-			controllerCount = AddController(&packet[34]);
-
-		}
-		else if(!lockStatus && pwrStatus == PWR_STATUS_OTHER && !syncMode && IsControllerAllowed(&packet[34])) {
-			pwrStatus = PWR_STATUS_PI;
-			digitalWrite(LED, HIGH);  // On
-			delay(100); // ms
-			digitalWrite(LED, LOW);	  // Off
+		if (packet[34] == 0x7e && packet[35] == 0xed)
+		{
+			if (syncMode && !clearMode) {
+				syncMode = false;
+				if (!IsControllerAllowed(&packet[34]))
+				{
+					controllerCount = AddController(&packet[34]);
+					saveControllerListToFile();
+				}
+			}
+			else if (clearMode)
+			{
+				clearMode = false;
+				if (IsControllerAllowed(&packet[34]))
+				{
+					controllerCount = RemoveController(&packet[34]);
+					saveControllerListToFile();
+				}
+			}
+			else if (!lockStatus && pwrStatus == PWR_STATUS_OTHER && IsControllerAllowed(&packet[34])) {
+				pwrStatus = PWR_STATUS_PI;
+				digitalWrite(LED, HIGH);  // On
+				delay(100); // ms
+				digitalWrite(LED, LOW);	  // Off
+			}
 		}
 
 	}
@@ -96,9 +160,6 @@ int main() {
 	int fd = -1;
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
-	pinMode(IR_TX, OUTPUT);
-	pinMode(IR_PWR, OUTPUT);
-
 	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45, 0xff, 0xff, 0xff, 0xff,0x62, 0x45,0xff, 0xff, 0xff, 0xff,
 		0xc0, 0xe9, 0x2f, 0x9f, 0xc2, 0x16, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x31, 0xc6, 0x0, 0x0, 0xdd, 0xc, 0x0, 0x50, 0xf2, 0x11, 0x1, 0x10, 0x0, 0xa1, 0x28, 0x9d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
 	size_t packet_size = sizeof(beaconPacketData);
@@ -126,13 +187,6 @@ int main() {
 			errbuf
 		);
 	}
-	wiringPiSetupSys();
-
-	pinMode(LED, OUTPUT);
-	pinMode(IR_PWR, OUTPUT);
-	digitalWrite(IR_PWR, HIGH);  // On
-	pinMode(IR_TX, OUTPUT);
-	digitalWrite(IR_PWR, HIGH);  // On
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 	int serial_port = open(TTY0_GS0, O_RDWR);
@@ -190,7 +244,10 @@ int main() {
 	int re = 0;
 	int num_bytes = 0;
 	bool isOpen = false;
-
+	loadControllerListFromFile();
+	if (GetControllerCount() <= 0) {
+		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+	}
 	signal(SIGHUP, SIG_IGN);
 	ret = poll(&ttyPoll, 1, 5000);
 
@@ -212,24 +269,30 @@ int main() {
 				break;
 			}
 
-			case TTY0_GIP_SYNC:
+			case TTY0_GIP_SYNC: //Untested
 			{
 				syncMode = true;
 				break;
 			}
-			case TTY0_GIP_SYNCED_CONTROLLER_COUNT:
+			case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
 			{
 				controllerCount = GetControllerCount();
 				write(serial_port, &controllerCount, sizeof(controllerCount));
 				break;
 			}
-			case TTY0_GIP_CLEAR:
+			case TTY0_GIP_CLEAR: //Untested
 			{
 				lockStatus = 0;
 				memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+				controllerCount = GetControllerCount();
 				break;
 			}
-			case TTY0_GIP_LOCK:
+			case TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER: //Untested
+			{
+				clearMode = true;
+				break;
+			}
+			case TTY0_GIP_LOCK: //Untested
 			{
 				lockStatus = 1;
 				break;
@@ -272,28 +335,49 @@ int main() {
 			write(serial_port, &pwrStatus, sizeof(pwrStatus));
 		}
 		if (ttyPoll.revents & POLLIN) {
+			unsigned short cmd = 0;
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
-			if (num_bytes > 0 && !isOpen)
+			if (num_bytes > 0)
 			{
 				isOpen = true;
-				pwrStatus = PWR_STATUS_OTHER;
 				switch (cmd)
 				{
 				case TTY0_GIP_POLL:
 				{
+					lockStatus = 0;
 					break;
 				}
-				case TTY0_GIP_SYNC:
+
+				case TTY0_GIP_SYNC: //Untested
 				{
-					digitalWrite(LED, HIGH);  // On
-					delay(100); // ms
-					digitalWrite(LED, LOW);	  // Off
+					syncMode = true;
 					break;
 				}
+				case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
 				{
+					controllerCount = GetControllerCount();
+					write(serial_port, &controllerCount, sizeof(controllerCount));
 					break;
 				}
-				} 
+				case TTY0_GIP_CLEAR: //Untested
+				{
+					lockStatus = 0;
+					memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+					controllerCount = GetControllerCount();
+					break;
+				}
+				case TTY0_GIP_LOCK: //Untested
+				{
+					lockStatus = 1;
+					break;
+				}
+				default:
+				{
+					isOpen = false;
+					break;
+				}
+				}
+
 			}
 		}
 		else if (ttyPoll.revents == 0 && isOpen) {
