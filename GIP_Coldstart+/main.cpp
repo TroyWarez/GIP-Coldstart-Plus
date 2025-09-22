@@ -123,6 +123,10 @@ void loadControllerListFromFile()
 		}
 		fclose(fp);
 	}
+	else
+	{
+		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+	}
 }
 void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* packet) {
 	if ( h->caplen >= 40) {
@@ -245,9 +249,7 @@ int main() {
 	int num_bytes = 0;
 	bool isOpen = false;
 	loadControllerListFromFile();
-	if (GetControllerCount() <= 0) {
-		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
-	}
+
 	signal(SIGHUP, SIG_IGN);
 	ret = poll(&ttyPoll, 1, 5000);
 
