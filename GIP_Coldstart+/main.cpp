@@ -57,6 +57,7 @@ int GetControllerCount()
 			return i;
 		}
 	}
+	return 0;
 }
 bool IsControllerAllowed(const u_char* mac) {
 	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
@@ -73,9 +74,10 @@ int AddController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
 		if (AllowControllerArrayList[i][0] == 0x00) {
 			memcpy(&AllowControllerArrayList[i][0], &mac[0], 6);
-			return GetControllerCount();
+			break;
 		}
 	}
+	return GetControllerCount();
 }
 int RemoveController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
@@ -162,20 +164,15 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-	int fd = -1;
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
-	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45, 0xff, 0xff, 0xff, 0xff,0x62, 0x45,0xff, 0xff, 0xff, 0xff,
-		0xc0, 0xe9, 0x2f, 0x9f, 0xc2, 0x16, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x31, 0xc6, 0x0, 0x0, 0xdd, 0xc, 0x0, 0x50, 0xf2, 0x11, 0x1, 0x10, 0x0, 0xa1, 0x28, 0x9d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
-	size_t packet_size = sizeof(beaconPacketData);
 	pcap_if_t* dev; /* name of the device to use */
 	char errbuf[PCAP_ERRBUF_SIZE];
-	struct bpf_program fp_prog;
 	u_char* userHandle = NULL;
 	pcap_t* handle = NULL;
 	/* ask pcap to find a valid device for use to sniff on */
-	int ret = pcap_init(0, errbuf);
-	ret = pcap_findalldevs(&dev, errbuf);
+	pcap_init(0, errbuf);
+	pcap_findalldevs(&dev, errbuf);
 	handle = pcap_open_live(
 		"wlan0mon",
 		BUFSIZ,
@@ -194,17 +191,18 @@ int main() {
 	}
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
+
+	const unsigned char beaconPacketData[80] = { 0x0, 0x0, 0x18, 0x0, 0x2b, 0x0, 0x0, 0x0, 0x7b, 0x84, 0xb5, 0x18, 0x0, 0x0, 0x0, 0x0, 0x10, 0x0, 0x99, 0x9, 0x0, 0x0, 0xb1, 0x00, 0x80, 0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x62, 0x45, 0xff, 0xff, 0xff, 0xff,0x62, 0x45,0xff, 0xff, 0xff, 0xff,
+	0xc0, 0xe9, 0x2f, 0x9f, 0xc2, 0x16, 0x0, 0x0, 0x0, 0x0, 0x64, 0x0, 0x31, 0xc6, 0x0, 0x0, 0xdd, 0xc, 0x0, 0x50, 0xf2, 0x11, 0x1, 0x10, 0x0, 0xa1, 0x28, 0x9d, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
+	int packet_size = sizeof(beaconPacketData);
 	int serial_port = open(TTY0_GS0, O_RDWR);
 	if (serial_port < 0) {
 		//printf("Error %i from open: %s\n", errno, strerror(errno));
 		return 1;
 	}
-	int serial = 0;
-	int bytes2 = 0;
 	// Create new termios struct, we call it 'tty' for convention
 	struct termios tty;
 	struct pollfd  ttyPoll;
-	struct stat SerialStat;
 	ttyPoll.fd = serial_port;
 	// Set up the poll structure
 	ttyPoll.events = POLLIN | POLLHUP | POLLOUT; // POLLIN for input, POLLHUP for hangup
@@ -246,13 +244,12 @@ int main() {
 		return 1;
 	}
 
-	int re = 0;
-	int num_bytes = 0;
+	ssize_t num_bytes = 0;
 	bool isOpen = false;
 	loadControllerListFromFile();
 
 	signal(SIGHUP, SIG_IGN);
-	ret = poll(&ttyPoll, 1, 5000);
+	poll(&ttyPoll, 1, 5000);
 
 	if (ttyPoll.revents & POLLHUP) {
 		close(serial_port);
@@ -312,6 +309,7 @@ int main() {
 	}
 
 	unsigned short cmd = 0;
+
 	while (true)
 	{
 		// Read bytes. The behaviour of read() (e.g. does it block?,
@@ -321,14 +319,14 @@ int main() {
 		{
 			if (handle)
 			{
-		ret = pcap_sendpacket(handle, beaconPacketData, packet_size);
-		pcap_dispatch(handle, -1, pcapCallback, userHandle);
+				pcap_sendpacket(handle, beaconPacketData, packet_size);
+				pcap_dispatch(handle, -1, pcapCallback, userHandle);
 			}
-			ret = poll(&ttyPoll, 1, 100);
+			poll(&ttyPoll, 1, 100);
 		}
 		else
 		{
-			ret = poll(&ttyPoll, 1, 500);
+			poll(&ttyPoll, 1, 500);
 		}
 		if (ttyPoll.revents & POLLHUP) {
 			close(serial_port);
@@ -339,7 +337,6 @@ int main() {
 			write(serial_port, &pwrStatus, sizeof(pwrStatus));
 		}
 		if (ttyPoll.revents & POLLIN) {
-			unsigned short cmd = 0;
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
 			if (num_bytes > 0)
 			{
@@ -385,7 +382,7 @@ int main() {
 			}
 		}
 		else if (ttyPoll.revents == 0 && isOpen) {
-			ret = poll(&ttyPoll, 1, 3000);
+			poll(&ttyPoll, 1, 3000);
 			if (!(ttyPoll.revents & POLLIN)) {
 				isOpen = false;
 			}
