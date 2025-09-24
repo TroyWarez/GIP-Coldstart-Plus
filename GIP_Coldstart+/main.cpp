@@ -81,8 +81,8 @@ int AddController(const u_char* mac) { // Return new controller count
 }
 int RemoveController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
-		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0) {
-			memset(&AllowControllerArrayList[i][0], 0, 6);
+		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0 && (i + 1 < CONTROLLER_ARRAY_SIZE) && AllowControllerArrayList[i + 1][0] != 0){
+			memcpy(&AllowControllerArrayList[i][0], &AllowControllerArrayList[i + 1][0], (sizeof(AllowControllerArrayList) - ((i + 1) * 6)));
 			break;
 		}
 		else if (AllowControllerArrayList[i][0] == 0x00) {
