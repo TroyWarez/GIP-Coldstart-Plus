@@ -41,7 +41,7 @@
 #define TTY0_GIP_SYNC 0xb0
 #define TTY0_GIP_CLEAR_ALL 0xb1
 #define TTY0_GIP_LOCK 0xb2
-#define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0xb3
+#define TTY0_GIP_GET_PWR_STATUS 0xb3
 #define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0xb4
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
@@ -237,7 +237,6 @@ int main() {
 	// Set in/out baud rate to be 9600
 	cfsetispeed(&tty, B9600);
 	cfsetospeed(&tty, B9600);
-	int lastCmd = 0;
 	int cmd = 0;
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
@@ -280,7 +279,7 @@ int main() {
 				controllerCount = GetControllerCount();
 				break;
 			}
-			case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
+			case TTY0_GIP_GET_PWR_STATUS: //Untested
 			{
 				controllerCount = GetControllerCount();
 				write(serial_port, &controllerCount, sizeof(controllerCount));
@@ -313,7 +312,6 @@ int main() {
 				break;
 			}
 			}
-			lastCmd = cmd;
 		}
 	}
 
@@ -355,7 +353,7 @@ int main() {
 					break;
 				}
 
-				case TTY0_GIP_SYNC: //Untested
+				case TTY0_GIP_SYNC:
 				{
 					lockStatus = true;
 					syncMode = true;
@@ -363,10 +361,12 @@ int main() {
 					controllerCount = GetControllerCount();
 					break;
 				}
-				case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
+				case TTY0_GIP_GET_PWR_STATUS: //Untested
 				{
+					lockStatus = false;
+					syncMode = false;
+					clearMode = false;
 					controllerCount = GetControllerCount();
-					write(serial_port, &controllerCount, sizeof(controllerCount));
 					break;
 				}
 				case TTY0_GIP_CLEAR_ALL: //Untested
@@ -396,7 +396,6 @@ int main() {
 					break;
 				}
 				}
-				lastCmd = cmd;
 			}
 		}
 		else if (ttyPoll.revents == 0 && isOpen) {
@@ -407,13 +406,13 @@ int main() {
 
 		}
 		if (ttyPoll.revents & POLLOUT) {
-			if (lastCmd == TTY0_GIP_POLL)
+			if (cmd == TTY0_GIP_POLL)
 			{
-				write(serial_port, &pwrStatus, sizeof(pwrStatus));
+				write(serial_port, &controllerCount, sizeof(controllerCount));
 			}
 			else
 			{
-				write(serial_port, &controllerCount, sizeof(controllerCount));
+				write(serial_port, &pwrStatus, sizeof(pwrStatus));
 			}
 
 		}
