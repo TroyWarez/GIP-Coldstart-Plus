@@ -180,15 +180,15 @@ int main() {
 		1,
 		errbuf
 	);
-// 	while (handle == NULL) {
-// 		handle = pcap_open_live(
-// 			"wlan0mon",
-// 			BUFSIZ,
-// 			1,
-// 			1,
-// 			errbuf
-// 		);
-// 	}
+	while (handle == NULL) {
+		handle = pcap_open_live(
+			"wlan0mon",
+			BUFSIZ,
+			1,
+			1,
+			errbuf
+		);
+	}
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 
