@@ -37,12 +37,12 @@
 #define CONTROLLER_MAC_ADDRESS_SIZE 6
 
 // GIP Commands
-#define TTY0_GIP_POLL 0x00af
-#define TTY0_GIP_SYNC 0x00b0
-#define TTY0_GIP_CLEAR_ALL 0x00b1
-#define TTY0_GIP_LOCK 0x00b2
-#define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0x00b3
-#define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0x00b4
+#define TTY0_GIP_POLL 0xaf
+#define TTY0_GIP_SYNC 0xb0
+#define TTY0_GIP_CLEAR_ALL 0xb1
+#define TTY0_GIP_LOCK 0xb2
+#define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0xb3
+#define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0xb4
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
@@ -180,15 +180,15 @@ int main() {
 		1,
 		errbuf
 	);
-	while (handle == NULL) {
-		handle = pcap_open_live(
-			"wlan0mon",
-			BUFSIZ,
-			1,
-			1,
-			errbuf
-		);
-	}
+// 	while (handle == NULL) {
+// 		handle = pcap_open_live(
+// 			"wlan0mon",
+// 			BUFSIZ,
+// 			1,
+// 			1,
+// 			errbuf
+// 		);
+// 	}
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 
@@ -237,8 +237,8 @@ int main() {
 	// Set in/out baud rate to be 9600
 	cfsetispeed(&tty, B9600);
 	cfsetospeed(&tty, B9600);
-	unsigned short lastCmd = 0;
-	unsigned short cmd = 0;
+	int lastCmd = 0;
+	int cmd = 0;
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
 		//printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
@@ -258,7 +258,7 @@ int main() {
 	}
 	if (ttyPoll.revents & POLLIN) {
 		num_bytes = read(serial_port, &cmd, sizeof(cmd));
-		if (num_bytes > 0)
+		if (num_bytes == sizeof(cmd))
 		{
 			isOpen = true;
 			switch (cmd)
@@ -339,18 +339,6 @@ int main() {
 			close(serial_port);
 			serial_port = open(TTY0_GS0, O_RDWR);
 		}
-
-		if (ttyPoll.revents & POLLOUT) {
-			if (lastCmd == TTY0_GIP_POLL)
-			{
-				write(serial_port, &pwrStatus, sizeof(pwrStatus));
-			}
-			else if (lastCmd == TTY0_GIP_POLL)
-			{
-				write(serial_port, &controllerCount, sizeof(controllerCount));
-			}
-
-		}
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
 			if (num_bytes > 0)
@@ -415,6 +403,17 @@ int main() {
 			poll(&ttyPoll, 1, 3000);
 			if (!(ttyPoll.revents & POLLIN)) {
 				isOpen = false;
+			}
+
+		}
+		if (ttyPoll.revents & POLLOUT) {
+			if (lastCmd == TTY0_GIP_POLL)
+			{
+				write(serial_port, &pwrStatus, sizeof(pwrStatus));
+			}
+			else
+			{
+				write(serial_port, &controllerCount, sizeof(controllerCount));
 			}
 
 		}
