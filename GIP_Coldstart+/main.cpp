@@ -39,10 +39,10 @@
 // GIP Commands
 #define TTY0_GIP_POLL 0x00af
 #define TTY0_GIP_SYNC 0x00b0
-#define TTY0_GIP_CLEAR 0x00b1
+#define TTY0_GIP_CLEAR_ALL 0x00b1
 #define TTY0_GIP_LOCK 0x00b2
 #define TTY0_GIP_SYNCED_CONTROLLER_COUNT 0x00b3
-#define TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER 0x00b4
+#define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0x00b4
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
 static int pwrStatus = PWR_STATUS_OTHER;
@@ -237,7 +237,8 @@ int main() {
 	// Set in/out baud rate to be 9600
 	cfsetispeed(&tty, B9600);
 	cfsetospeed(&tty, B9600);
-
+	unsigned short lastCmd = 0;
+	unsigned short cmd = 0;
 	// Save tty settings, also checking for error
 	if (tcsetattr(serial_port, TCSANOW, &tty) != 0) {
 		//printf("Error %i from tcsetattr: %s\n", errno, strerror(errno));
@@ -256,7 +257,6 @@ int main() {
 		serial_port = open(TTY0_GS0, O_RDWR);
 	}
 	if (ttyPoll.revents & POLLIN) {
-		unsigned short cmd = 0;
 		num_bytes = read(serial_port, &cmd, sizeof(cmd));
 		if (num_bytes > 0)
 		{
@@ -266,12 +266,18 @@ int main() {
 			case TTY0_GIP_POLL:
 			{
 				lockStatus = false;
+				syncMode = false;
+				clearMode = false;
+				controllerCount = GetControllerCount();
 				break;
 			}
 
 			case TTY0_GIP_SYNC: //Untested
 			{
+				lockStatus = true;
 				syncMode = true;
+				clearMode = false;
+				controllerCount = GetControllerCount();
 				break;
 			}
 			case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
@@ -280,16 +286,19 @@ int main() {
 				write(serial_port, &controllerCount, sizeof(controllerCount));
 				break;
 			}
-			case TTY0_GIP_CLEAR: //Untested
+			case TTY0_GIP_CLEAR_ALL: //Untested
 			{
-				lockStatus = false;
+				lockStatus = true;
+				syncMode = false;
+				clearMode = false;
 				remove("/boot/allowed_controllers.txt");
 				memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 				controllerCount = GetControllerCount();
 				break;
 			}
-			case TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER: //Untested
+			case TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER: //Untested
 			{
+				lockStatus = true;
 				clearMode = true;
 				break;
 			}
@@ -298,17 +307,15 @@ int main() {
 				lockStatus = true;
 				break;
 			}
-			default: 
+			default:
 			{
 				isOpen = false;
 				break;
 			}
 			}
-
+			lastCmd = cmd;
 		}
 	}
-
-	unsigned short cmd = 0;
 
 	while (true)
 	{
@@ -334,7 +341,15 @@ int main() {
 		}
 
 		if (ttyPoll.revents & POLLOUT) {
-			write(serial_port, &pwrStatus, sizeof(pwrStatus));
+			if (lastCmd == TTY0_GIP_POLL)
+			{
+				write(serial_port, &pwrStatus, sizeof(pwrStatus));
+			}
+			else if (lastCmd == TTY0_GIP_POLL)
+			{
+				write(serial_port, &controllerCount, sizeof(controllerCount));
+			}
+
 		}
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
@@ -345,13 +360,19 @@ int main() {
 				{
 				case TTY0_GIP_POLL:
 				{
-					lockStatus = 0;
+					lockStatus = false;
+					syncMode = false;
+					clearMode = false;
+					controllerCount = GetControllerCount();
 					break;
 				}
 
 				case TTY0_GIP_SYNC: //Untested
 				{
+					lockStatus = true;
 					syncMode = true;
+					clearMode = false;
+					controllerCount = GetControllerCount();
 					break;
 				}
 				case TTY0_GIP_SYNCED_CONTROLLER_COUNT: //Untested
@@ -360,16 +381,25 @@ int main() {
 					write(serial_port, &controllerCount, sizeof(controllerCount));
 					break;
 				}
-				case TTY0_GIP_CLEAR: //Untested
+				case TTY0_GIP_CLEAR_ALL: //Untested
 				{
-					lockStatus = 0;
+					lockStatus = true;
+					syncMode = false;
+					clearMode = false;
+					remove("/boot/allowed_controllers.txt");
 					memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 					controllerCount = GetControllerCount();
 					break;
 				}
+				case TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER: //Untested
+				{
+					lockStatus = true;
+					clearMode = true;
+					break;
+				}
 				case TTY0_GIP_LOCK: //Untested
 				{
-					lockStatus = 1;
+					lockStatus = true;
 					break;
 				}
 				default:
@@ -378,7 +408,7 @@ int main() {
 					break;
 				}
 				}
-
+				lastCmd = cmd;
 			}
 		}
 		else if (ttyPoll.revents == 0 && isOpen) {
