@@ -28,7 +28,7 @@
 // /boot/./GIP_Coldstart+.out
 #define	LED	24
 #define	PI_LED	27
-#define TTY0_GS0 "/dev/ttyAMA0"
+#define TTY0_GS0 "/dev/ttyGS0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -43,12 +43,12 @@
 #define TTY0_GIP_GET_PWR_STATUS 0xb3
 #define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0xb4
 
-static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 }; // TO DO: Populate controller list and save to file.
+static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 };
 static int pwrStatus = PWR_STATUS_OTHER;
 static int lockStatus = false;
 static int syncMode = false;
 static int clearMode = false;
-static int controllerCount = false;
+static int controllerCount = 0;
 int GetControllerCount()
 {
 	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
@@ -80,7 +80,7 @@ int AddController(const u_char* mac) { // Return new controller count
 }
 int RemoveController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
-		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0 && (i + 1 < CONTROLLER_ARRAY_SIZE) && AllowControllerArrayList[i + 1][0] != 0){
+		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0 && (i + 1 < CONTROLLER_ARRAY_SIZE)){
 			memcpy(&AllowControllerArrayList[i][0], &AllowControllerArrayList[i + 1][0], (sizeof(AllowControllerArrayList) - ((i + 1) * 6)));
 			break;
 		}
@@ -155,9 +155,9 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 			}
 			else if (!lockStatus && pwrStatus == PWR_STATUS_OTHER && IsControllerAllowed(&packet[34])) {
 				pwrStatus = PWR_STATUS_PI;
-// 				digitalWrite(LED, HIGH);  // On
-// 				delay(100); // ms
-// 				digitalWrite(LED, LOW);	  // Off
+				digitalWrite(LED, HIGH);  // On
+				delay(100); // ms
+				digitalWrite(LED, LOW);	  // Off
 			}
 		}
 
@@ -165,7 +165,6 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-	//printf("GIP Coldstart+ started!\n");
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
 	pcap_if_t* dev; /* name of the device to use */
