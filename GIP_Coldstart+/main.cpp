@@ -13,7 +13,6 @@
 #include <poll.h>
 #include <cstdlib>
 #include <stdio.h>
-#include <time.h>
 // LED Pin - wiringPi pin 0 is BCM_GPIO 17.
 // we have to use BCM numbering when initializing with wiringPiSetupSys
 // when choosing a different pin number please use the BCM numbering, also
@@ -29,7 +28,7 @@
 // /boot/./GIP_Coldstart+.out
 #define	LED	24
 #define	PI_LED	27
-#define TTY0_GS0 "/dev/ttyGS0"
+#define TTY0_GS0 "/dev/ttyAMA0"
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -154,9 +153,9 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 			}
 			else if (!lockStatus && pwrStatus == PWR_STATUS_OTHER && IsControllerAllowed(&packet[34])) {
 				pwrStatus = PWR_STATUS_PI;
-				digitalWrite(LED, HIGH);  // On
-				delay(100); // ms
-				digitalWrite(LED, LOW);	  // Off
+// 				digitalWrite(LED, HIGH);  // On
+// 				delay(100); // ms
+// 				digitalWrite(LED, LOW);	  // Off
 			}
 		}
 
@@ -164,6 +163,7 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
+	printf("GIP Coldstart+ started!\n");
 	wiringPiSetupSys();
 	pinMode(LED, OUTPUT);
 	pcap_if_t* dev; /* name of the device to use */
