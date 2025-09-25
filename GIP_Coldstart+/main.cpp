@@ -135,7 +135,6 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 	if ( h->caplen >= 40) {
 		if (packet[34] == 0x7e && packet[35] == 0xed)
 		{
-			syncMode = true; // Debug, remove me
 			if (syncMode && !clearMode) {
 				syncMode = false;
 				if (!IsControllerAllowed(&packet[34]))
