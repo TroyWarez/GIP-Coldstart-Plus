@@ -92,7 +92,7 @@ int RemoveController(const u_char* mac) { // Return new controller count
 }
 void saveControllerListToFile()
 {
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = fopen("/boot/allowed_controllers.txt", "w");
 	if (fp != NULL) {
 		for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
@@ -108,7 +108,7 @@ void saveControllerListToFile()
 }
 void loadControllerListFromFile()
 {
-	FILE* fp;
+	FILE* fp = NULL;
 	fp = fopen("/boot/allowed_controllers.txt", "r");
 	if (fp != NULL) {
 		memset(&AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
