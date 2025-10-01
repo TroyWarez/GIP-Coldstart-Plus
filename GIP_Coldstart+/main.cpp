@@ -270,51 +270,11 @@ int main() {
 				controllerCount = GetControllerCount();
 				break;
 			}
-
-			case TTY0_GIP_SYNC: //Untested
-			{
-				lockStatus = true;
-				syncMode = true;
-				clearMode = false;
-				controllerCount = GetControllerCount();
-				break;
-			}
-			case TTY0_GIP_GET_PWR_STATUS: //Untested
-			{
-				controllerCount = GetControllerCount();
-				write(serial_port, &controllerCount, sizeof(controllerCount));
-				break;
-			}
-			case TTY0_GIP_CLEAR_ALL: //Untested
-			{
-				lockStatus = true;
-				syncMode = false;
-				clearMode = false;
-				remove("/boot/allowed_controllers.txt");
-				memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
-				controllerCount = GetControllerCount();
-				break;
-			}
-			case TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER: //Untested
-			{
-				lockStatus = true;
-				clearMode = true;
-				break;
-			}
-			case TTY0_GIP_LOCK: //Untested
-			{
-				lockStatus = true;
-				break;
-			}
-			default:
-			{
-				isOpen = false;
-				break;
-			}
 			}
 		}
 	}
 
+	cmd = TTY0_GIP_POLL;
 	while (true)
 	{
 		// Read bytes. The behaviour of read() (e.g. does it block?,
@@ -409,6 +369,7 @@ int main() {
 			if (cmd == TTY0_GIP_POLL)
 			{
 				write(serial_port, &controllerCount, sizeof(controllerCount));
+
 			}
 			else
 			{
