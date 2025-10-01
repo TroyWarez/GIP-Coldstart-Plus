@@ -41,7 +41,7 @@
 #define TTY0_GIP_CLEAR_ALL 0xb1
 #define TTY0_GIP_LOCK 0xb2
 #define TTY0_GIP_GET_PWR_STATUS 0xb3
-#define TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER 0xb4
+#define TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER 0xb4
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 };
 static int pwrStatus = PWR_STATUS_OTHER;
@@ -180,15 +180,15 @@ int main() {
 		1,
 		errbuf
 	);
-	while (handle == NULL) {
-		handle = pcap_open_live(
-			"wlan0mon",
-			BUFSIZ,
-			1,
-			1,
-			errbuf
-		);
-	}
+// 	while (handle == NULL) {
+// 		handle = pcap_open_live(
+// 			"wlan0mon",
+// 			BUFSIZ,
+// 			1,
+// 			1,
+// 			errbuf
+// 		);
+// 	}
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 
@@ -304,6 +304,7 @@ int main() {
 				isOpen = true;
 				switch (cmd)
 				{
+				case TTY0_GIP_GET_PWR_STATUS:
 				case TTY0_GIP_POLL:
 				{
 					lockStatus = false;
@@ -321,14 +322,6 @@ int main() {
 					controllerCount = GetControllerCount();
 					break;
 				}
-				case TTY0_GIP_GET_PWR_STATUS: //Untested
-				{
-					lockStatus = false;
-					syncMode = false;
-					clearMode = false;
-					controllerCount = GetControllerCount();
-					break;
-				}
 				case TTY0_GIP_CLEAR_ALL: //Untested
 				{
 					lockStatus = true;
@@ -339,7 +332,7 @@ int main() {
 					controllerCount = GetControllerCount();
 					break;
 				}
-				case TTY0_GIP_CLEAR_ALL_NEXT_SYNCED_CONTROLLER: //Untested
+				case TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER: //Untested
 				{
 					lockStatus = true;
 					clearMode = true;
@@ -362,18 +355,18 @@ int main() {
 			poll(&ttyPoll, 1, 3000);
 			if (!(ttyPoll.revents & POLLIN)) {
 				isOpen = false;
+				pwrStatus = PWR_STATUS_OTHER;
 			}
 
 		}
 		if (ttyPoll.revents & POLLOUT) {
-			if (cmd == TTY0_GIP_POLL)
+			if (cmd == TTY0_GIP_GET_PWR_STATUS)
 			{
-				write(serial_port, &controllerCount, sizeof(controllerCount));
-
+				write(serial_port, &pwrStatus, sizeof(pwrStatus));
 			}
 			else
 			{
-				write(serial_port, &pwrStatus, sizeof(pwrStatus));
+				write(serial_port, &controllerCount, sizeof(controllerCount));
 			}
 
 		}
