@@ -304,6 +304,7 @@ int main() {
 			if (num_bytes > 0)
 			{
 				isOpen = true;
+				controllerCount = GetControllerCount();
 				switch (cmd)
 				{
 				case TTY0_GIP_GET_PWR_STATUS:
@@ -312,7 +313,6 @@ int main() {
 					lockStatus = false;
 					syncMode = false;
 					clearMode = false;
-					controllerCount = GetControllerCount();
 					break;
 				}
 
@@ -321,10 +321,9 @@ int main() {
 					lockStatus = true;
 					syncMode = true;
 					clearMode = false;
-					controllerCount = GetControllerCount();
 					break;
 				}
-				case TTY0_GIP_CLEAR_ALL: //Untested
+				case TTY0_GIP_CLEAR_ALL:
 				{
 					lockStatus = false;
 					syncMode = false;
@@ -334,23 +333,28 @@ int main() {
 						remove("/boot/allowed_controllers.txt");
 						memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
 					}
-					controllerCount = GetControllerCount();
 					break;
 				}
 				case TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER: //Untested
 				{
 					lockStatus = true;
 					clearMode = true;
+					syncMode = false;
 					break;
 				}
-				case TTY0_GIP_LOCK: //Untested
+				case TTY0_GIP_LOCK:
 				{
 					lockStatus = true;
+					syncMode = false;
+					clearMode = false;
 					break;
 				}
 				default:
 				{
 					isOpen = false;
+					lockStatus = false;
+					syncMode = false;
+					clearMode = false;
 					break;
 				}
 				}
