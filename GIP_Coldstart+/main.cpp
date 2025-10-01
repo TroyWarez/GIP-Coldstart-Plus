@@ -180,15 +180,15 @@ int main() {
 		1,
 		errbuf
 	);
-// 	while (handle == NULL) {
-// 		handle = pcap_open_live(
-// 			"wlan0mon",
-// 			BUFSIZ,
-// 			1,
-// 			1,
-// 			errbuf
-// 		);
-// 	}
+	while (handle == NULL) {
+		handle = pcap_open_live(
+			"wlan0mon",
+			BUFSIZ,
+			1,
+			1,
+			errbuf
+		);
+	}
 
 	// Open the serial port. Change device path as needed (currently set to an standard FTDI USB-UART cable type device)
 
@@ -280,7 +280,9 @@ int main() {
 		// Read bytes. The behaviour of read() (e.g. does it block?,
 		// how long does it block for?) depends on the configuration
 		// settings above, specifically VMIN and VTIME
-		if ( !isOpen && pwrStatus == PWR_STATUS_OTHER)
+		if ( (!isOpen && pwrStatus == PWR_STATUS_OTHER) || 
+			(cmd == TTY0_GIP_SYNC && lockStatus) ||
+			(cmd == TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER && lockStatus))
 		{
 			if (handle)
 			{
@@ -324,11 +326,14 @@ int main() {
 				}
 				case TTY0_GIP_CLEAR_ALL: //Untested
 				{
-					lockStatus = true;
+					lockStatus = false;
 					syncMode = false;
 					clearMode = false;
-					remove("/boot/allowed_controllers.txt");
-					memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+					if (controllerCount)
+					{
+						remove("/boot/allowed_controllers.txt");
+						memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
+					}
 					controllerCount = GetControllerCount();
 					break;
 				}
