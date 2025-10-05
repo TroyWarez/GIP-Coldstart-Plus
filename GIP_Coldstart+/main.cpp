@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #include <fcntl.h> // Contains file controls like O_RDWR
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
@@ -49,6 +50,25 @@ static int lockStatus = false;
 static int syncMode = false;
 static int clearMode = false;
 static int controllerCount = 0;
+
+enum { NS_PER_SECOND = 1000000000 };
+
+void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
+{
+	td->tv_nsec = t2.tv_nsec - t1.tv_nsec;
+	td->tv_sec = t2.tv_sec - t1.tv_sec;
+	if (td->tv_sec > 0 && td->tv_nsec < 0)
+	{
+		td->tv_nsec += NS_PER_SECOND;
+		td->tv_sec--;
+	}
+	else if (td->tv_sec < 0 && td->tv_nsec > 0)
+	{
+		td->tv_nsec -= NS_PER_SECOND;
+		td->tv_sec++;
+	}
+}
+
 int GetControllerCount()
 {
 	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
@@ -262,6 +282,7 @@ int main() {
 			isOpen = true;
 			switch (cmd)
 			{
+			case TTY0_GIP_GET_PWR_STATUS:
 			case TTY0_GIP_POLL:
 			{
 				lockStatus = false;
@@ -273,13 +294,15 @@ int main() {
 			}
 		}
 	}
+	timespec Time1, Time2, deltaTime;
+	memset(&Time1, 0, sizeof(Time1));
+	memset(&Time2, 0, sizeof(Time2));
+	memset(&Time2, 0, sizeof(deltaTime));
 
 	cmd = TTY0_GIP_POLL;
 	while (true)
 	{
-		// Read bytes. The behaviour of read() (e.g. does it block?,
-		// how long does it block for?) depends on the configuration
-		// settings above, specifically VMIN and VTIME
+		clock_gettime(CLOCK_REALTIME, &Time1);
 		if ( (!isOpen && pwrStatus == PWR_STATUS_OTHER) || 
 			(cmd == TTY0_GIP_SYNC && lockStatus) ||
 			(cmd == TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER && lockStatus))
@@ -299,11 +322,20 @@ int main() {
 			close(serial_port);
 			serial_port = open(TTY0_GS0, O_RDWR);
 		}
+
+		if (Time1.tv_sec != 0 &&
+			Time2.tv_sec != 0)
+		{
+			sub_timespec(Time1, Time2, &deltaTime);
+		}
+
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
 			if (num_bytes > 0)
 			{
 				isOpen = true;
+				clock_gettime(CLOCK_REALTIME, &Time2);
+				Time2.tv_sec += 3;
 				controllerCount = GetControllerCount();
 				switch (cmd)
 				{
@@ -360,13 +392,13 @@ int main() {
 				}
 			}
 		}
-		else if (ttyPoll.revents == 0 && isOpen) {
-			poll(&ttyPoll, 1, 3000);
-			if (!(ttyPoll.revents & POLLIN)) {
-				isOpen = false;
-				pwrStatus = PWR_STATUS_OTHER;
-			}
+		else if (deltaTime.tv_sec < -5 && isOpen) {
+			isOpen = false;
+			pwrStatus = PWR_STATUS_OTHER;
 
+			memset(&Time1, 0, sizeof(Time1));
+			memset(&Time2, 0, sizeof(Time2));
+			memset(&deltaTime, 0, sizeof(deltaTime));
 		}
 		if (ttyPoll.revents & POLLOUT) {
 			if (cmd == TTY0_GIP_GET_PWR_STATUS)
