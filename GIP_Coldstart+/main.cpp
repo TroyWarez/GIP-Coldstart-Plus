@@ -45,15 +45,15 @@
 #define TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER 0xb4
 
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 };
-static int pwrStatus = PWR_STATUS_OTHER;
-static int lockStatus = false;
-static int syncMode = false;
-static int clearMode = false;
-static int controllerCount = 0;
+static unsigned int pwrStatus = PWR_STATUS_OTHER;
+static bool lockStatus = false;
+static bool syncMode = false;
+static bool clearMode = false;
+static unsigned int controllerCount = 0;
 
 enum { NS_PER_SECOND = 1000000000 };
 
-void sub_timespec(struct timespec t1, struct timespec t2, struct timespec* td)
+void sub_timespec(timespec t1, timespec t2, timespec* td)
 {
 	td->tv_nsec = t2.tv_nsec - t1.tv_nsec;
 	td->tv_sec = t2.tv_sec - t1.tv_sec;
