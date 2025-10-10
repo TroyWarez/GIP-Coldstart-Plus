@@ -28,8 +28,7 @@
 // kill $pid
 // /boot/./GIP_Coldstart+.out
 #define	LED	24
-#define	PI_LED	27
-#define TTY0_GS0 "/dev/ttyGS0"
+#define TTY0_GS0 "/dev/ttyAMA0" // Change this to your preferred serial device
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -68,7 +67,6 @@ void sub_timespec(timespec t1, timespec t2, timespec* td)
 		td->tv_sec++;
 	}
 }
-
 int GetControllerCount()
 {
 	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
@@ -318,10 +316,6 @@ int main() {
 		{
 			poll(&ttyPoll, 1, 500);
 		}
-		if (ttyPoll.revents & POLLHUP) {
-			close(serial_port);
-			serial_port = open(TTY0_GS0, O_RDWR);
-		}
 
 		if (Time1.tv_sec != 0 &&
 			Time2.tv_sec != 0)
@@ -410,7 +404,7 @@ int main() {
 				write(serial_port, &controllerCount, sizeof(controllerCount));
 			}
 
-		}
+	}
 	}
 
 
