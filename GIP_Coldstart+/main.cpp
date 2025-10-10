@@ -22,13 +22,13 @@
 
 //Start up Script:
 // # bash
-// airmon-ng start wlan0
-// airodump-ng -c 1 wlan0mon & pid = $!
-// sleep 5
-// kill $pid
-// /boot/./GIP_Coldstart+.out
-#define	LED	24
-#define TTY0_GS0 "/dev/ttyAMA0" // Change this to your preferred serial device
+// sudo airmon-ng start wlan0
+// sudo airodump-ng -c 1 wlan0mon & pid = $!
+// sudo sleep 5
+// sudo kill $pid
+// sudo /boot/./GIP_Coldstart+.out
+#define	LED	12
+#define TTY0_GS0 "/dev/ttyGS0" // Change this to your preferred serial device
 #define PWR_STATUS_PI 0xef
 #define PWR_STATUS_OTHER 0xaf
 
@@ -182,8 +182,6 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
-	wiringPiSetupSys();
-	pinMode(LED, OUTPUT);
 	pcap_if_t* dev; /* name of the device to use */
 	char errbuf[PCAP_ERRBUF_SIZE];
 	u_char* userHandle = NULL;
