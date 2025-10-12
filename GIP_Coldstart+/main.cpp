@@ -182,6 +182,8 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 
 }
 int main() {
+	wiringPiSetupSys();
+	pinMode(LED, OUTPUT);
 	pcap_if_t* dev; /* name of the device to use */
 	char errbuf[PCAP_ERRBUF_SIZE];
 	u_char* userHandle = NULL;
@@ -196,6 +198,7 @@ int main() {
 		1,
 		errbuf
 	);
+
 	while (handle == NULL) {
 		handle = pcap_open_live(
 			"wlan0mon",
@@ -392,6 +395,13 @@ int main() {
 			memset(&Time2, 0, sizeof(Time2));
 			memset(&deltaTime, 0, sizeof(deltaTime));
 		}
+// 		else if (ttyPoll.revents == 0 && isOpen) {
+// 			poll(&ttyPoll, 1, 3000);
+// 			if (!(ttyPoll.revents & POLLIN)) {
+// 				isOpen = false;
+// 				pwrStatus = PWR_STATUS_OTHER;
+// 			}
+// 		}
 		if (ttyPoll.revents & POLLOUT) {
 			if (cmd == TTY0_GIP_GET_PWR_STATUS)
 			{
@@ -401,8 +411,7 @@ int main() {
 			{
 				write(serial_port, &controllerCount, sizeof(controllerCount));
 			}
-
-	}
+		}
 	}
 
 
