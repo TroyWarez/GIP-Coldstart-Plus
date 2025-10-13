@@ -7,7 +7,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <signal.h>
-#include <time.h>
 #include <fcntl.h> // Contains file controls like O_RDWR
 #include <termios.h> // Contains POSIX terminal control definitions
 #include <unistd.h> // write(), read(), close()
@@ -293,15 +292,10 @@ int main() {
 			}
 		}
 	}
-	timespec Time1, Time2, deltaTime;
-	memset(&Time1, 0, sizeof(Time1));
-	memset(&Time2, 0, sizeof(Time2));
-	memset(&Time2, 0, sizeof(deltaTime));
 
 	cmd = TTY0_GIP_POLL;
 	while (true)
 	{
-		clock_gettime(CLOCK_REALTIME, &Time1);
 		if ( (!isOpen && pwrStatus == PWR_STATUS_OTHER) || 
 			(cmd == TTY0_GIP_SYNC && lockStatus) ||
 			(cmd == TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER && lockStatus))
@@ -311,26 +305,21 @@ int main() {
 				pcap_sendpacket(handle, beaconPacketData, packet_size);
 				pcap_dispatch(handle, -1, pcapCallback, userHandle);
 			}
-			poll(&ttyPoll, 1, 100);
+			poll(&ttyPoll, 1, 10);
 		}
 		else
 		{
-			poll(&ttyPoll, 1, 500);
+			poll(&ttyPoll, 1, 50);
 		}
-
-		if (Time1.tv_sec != 0 &&
-			Time2.tv_sec != 0)
-		{
-			sub_timespec(Time1, Time2, &deltaTime);
+		if (ttyPoll.revents & POLLHUP) {
+			close(serial_port);
+			serial_port = open(TTY0_GS0, O_RDWR);
 		}
-
 		if (ttyPoll.revents & POLLIN) {
 			num_bytes = read(serial_port, &cmd, sizeof(cmd));
 			if (num_bytes > 0)
 			{
 				isOpen = true;
-				clock_gettime(CLOCK_REALTIME, &Time2);
-				Time2.tv_sec += 3;
 				controllerCount = GetControllerCount();
 				switch (cmd)
 				{
@@ -387,21 +376,13 @@ int main() {
 				}
 			}
 		}
-		else if (deltaTime.tv_sec < -5 && isOpen) {
-			isOpen = false;
-			pwrStatus = PWR_STATUS_OTHER;
-
-			memset(&Time1, 0, sizeof(Time1));
-			memset(&Time2, 0, sizeof(Time2));
-			memset(&deltaTime, 0, sizeof(deltaTime));
+		else if (ttyPoll.revents == 0 && isOpen) {
+			poll(&ttyPoll, 1, 3000);
+			if (!(ttyPoll.revents & POLLIN)) {
+				isOpen = false;
+				pwrStatus = PWR_STATUS_OTHER;
+			}
 		}
-// 		else if (ttyPoll.revents == 0 && isOpen) {
-// 			poll(&ttyPoll, 1, 3000);
-// 			if (!(ttyPoll.revents & POLLIN)) {
-// 				isOpen = false;
-// 				pwrStatus = PWR_STATUS_OTHER;
-// 			}
-// 		}
 		if (ttyPoll.revents & POLLOUT) {
 			if (cmd == TTY0_GIP_GET_PWR_STATUS)
 			{
