@@ -19,13 +19,13 @@
 // update the Property Pages - Build Events - Remote Post-Build Event command
 // which uses gpio export for setup for wiringPiSetupSys
 
-//Start up Script:
-// # bash
+// Start up Script (Required):
+// #!/bin/bash
+// sudo modprobe g_serial
 // sudo airmon-ng start wlan0
-// sudo airodump-ng -c 1 wlan0mon & pid = $!
-// sudo sleep 5
-// sudo kill $pid
+// sudo airodump-ng -c 1 wlan0mon &
 // sudo /boot/./GIP_Coldstart+.out
+
 #define	LED	12
 #define TTY0_GS0 "/dev/ttyGS0" // Change this to your preferred serial device
 #define PWR_STATUS_PI 0xef
