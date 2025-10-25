@@ -39,15 +39,18 @@
 #define TTY0_GIP_SYNC 0xb0
 #define TTY0_GIP_CLEAR_ALL 0xb1
 #define TTY0_GIP_LOCK 0xb2
-#define TTY0_GIP_GET_PWR_STATUS 0xb3
 #define TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER 0xb4
 
+struct GIPSerialData {
+	unsigned short pwrStatus;
+	unsigned short controllerCount;
+};
+
 static unsigned char AllowControllerArrayList[CONTROLLER_ARRAY_SIZE][CONTROLLER_MAC_ADDRESS_SIZE] = { 0x00 };
-static unsigned int pwrStatus = PWR_STATUS_OTHER;
+static GIPSerialData serialData = { PWR_STATUS_OTHER, 0x0 };
 static bool lockStatus = false;
 static bool syncMode = false;
 static bool clearMode = false;
-static unsigned int controllerCount = 0;
 
 enum { NS_PER_SECOND = 1000000000 };
 
@@ -66,9 +69,9 @@ void sub_timespec(timespec t1, timespec t2, timespec* td)
 		td->tv_sec++;
 	}
 }
-int GetControllerCount()
+unsigned short GetControllerCount()
 {
-	for( int i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
+	for(unsigned short i = 0; i < CONTROLLER_ARRAY_SIZE; i++ ) {
 		if (AllowControllerArrayList[i][0] == 0x00) {
 			return i;
 		}
@@ -86,7 +89,7 @@ bool IsControllerAllowed(const u_char* mac) {
 	}
 	return false;
 }
-int AddController(const u_char* mac) { // Return new controller count
+unsigned short AddController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
 		if (AllowControllerArrayList[i][0] == 0x00) {
 			memcpy(&AllowControllerArrayList[i][0], &mac[0], 6);
@@ -95,7 +98,7 @@ int AddController(const u_char* mac) { // Return new controller count
 	}
 	return GetControllerCount();
 }
-int RemoveController(const u_char* mac) { // Return new controller count
+unsigned short RemoveController(const u_char* mac) { // Return new controller count
 	for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
 		if (memcmp(&mac[0], &AllowControllerArrayList[i][0], 6) == 0 && (i + 1 < CONTROLLER_ARRAY_SIZE)){
 			memcpy(&AllowControllerArrayList[i][0], &AllowControllerArrayList[i + 1][0], (sizeof(AllowControllerArrayList) - ((i + 1) * 6)));
@@ -111,8 +114,9 @@ void saveControllerListToFile()
 {
 	FILE* fp = NULL;
 	fp = fopen("/boot/allowed_controllers.txt", "w");
+	int i = 0;
 	if (fp != NULL) {
-		for (int i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
+		for ( i = 0; i < CONTROLLER_ARRAY_SIZE; i++) {
 			if (AllowControllerArrayList[i][0] != 0x00) {
 				fprintf(fp, "%02x:%02x:%02x:%02x:%02x:%02x\n", AllowControllerArrayList[i][0], AllowControllerArrayList[i][1], AllowControllerArrayList[i][2], AllowControllerArrayList[i][3], AllowControllerArrayList[i][4], AllowControllerArrayList[i][5]);
 			}
@@ -121,6 +125,9 @@ void saveControllerListToFile()
 			}
 		}
 		fclose(fp);
+		if (i == 0) {
+			remove("/boot/allowed_controllers.txt");
+		}
 	}
 }
 void loadControllerListFromFile()
@@ -141,7 +148,7 @@ void loadControllerListFromFile()
 			}
 		}
 		fclose(fp);
-		controllerCount = GetControllerCount();
+		serialData.controllerCount = GetControllerCount();
 	}
 	else
 	{
@@ -156,7 +163,7 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 				syncMode = false;
 				if (!IsControllerAllowed(&packet[34]))
 				{
-					controllerCount = AddController(&packet[34]);
+					serialData.controllerCount = AddController(&packet[34]);
 					saveControllerListToFile();
 				}
 			}
@@ -165,12 +172,12 @@ void pcapCallback(u_char* arg_array, const struct pcap_pkthdr* h, const u_char* 
 				clearMode = false;
 				if (IsControllerAllowed(&packet[34]))
 				{
-					controllerCount = RemoveController(&packet[34]);
+					serialData.controllerCount = RemoveController(&packet[34]);
 					saveControllerListToFile();
 				}
 			}
-			else if (!lockStatus && pwrStatus == PWR_STATUS_OTHER && IsControllerAllowed(&packet[34])) {
-				pwrStatus = PWR_STATUS_PI;
+			else if (!lockStatus && serialData.pwrStatus == PWR_STATUS_OTHER && IsControllerAllowed(&packet[34])) {
+				serialData.pwrStatus = PWR_STATUS_PI;
 				digitalWrite(LED, HIGH);  // On
 				delay(100); // ms
 				digitalWrite(LED, LOW);	  // Off
@@ -280,13 +287,12 @@ int main() {
 			isOpen = true;
 			switch (cmd)
 			{
-			case TTY0_GIP_GET_PWR_STATUS:
 			case TTY0_GIP_POLL:
 			{
 				lockStatus = false;
 				syncMode = false;
 				clearMode = false;
-				controllerCount = GetControllerCount();
+				serialData.controllerCount = GetControllerCount();
 				break;
 			}
 			}
@@ -296,7 +302,7 @@ int main() {
 	cmd = TTY0_GIP_POLL;
 	while (true)
 	{
-		if ( (!isOpen && pwrStatus == PWR_STATUS_OTHER) || 
+		if ( (!isOpen && serialData.pwrStatus == PWR_STATUS_OTHER) || 
 			(cmd == TTY0_GIP_SYNC && lockStatus) ||
 			(cmd == TTY0_GIP_CLEAR_NEXT_SYNCED_CONTROLLER && lockStatus))
 		{
@@ -320,10 +326,9 @@ int main() {
 			if (num_bytes > 0)
 			{
 				isOpen = true;
-				controllerCount = GetControllerCount();
+				serialData.controllerCount = GetControllerCount();
 				switch (cmd)
 				{
-				case TTY0_GIP_GET_PWR_STATUS:
 				case TTY0_GIP_POLL:
 				{
 					lockStatus = false;
@@ -344,7 +349,7 @@ int main() {
 					lockStatus = false;
 					syncMode = false;
 					clearMode = false;
-					if (controllerCount)
+					if (serialData.controllerCount)
 					{
 						remove("/boot/allowed_controllers.txt");
 						memset(AllowControllerArrayList, 0, sizeof(AllowControllerArrayList));
@@ -380,18 +385,11 @@ int main() {
 			poll(&ttyPoll, 1, 3000);
 			if (!(ttyPoll.revents & POLLIN)) {
 				isOpen = false;
-				pwrStatus = PWR_STATUS_OTHER;
+				serialData.pwrStatus = PWR_STATUS_OTHER;
 			}
 		}
 		if (ttyPoll.revents & POLLOUT) {
-			if (cmd == TTY0_GIP_GET_PWR_STATUS)
-			{
-				write(serial_port, &pwrStatus, sizeof(pwrStatus));
-			}
-			else
-			{
-				write(serial_port, &controllerCount, sizeof(controllerCount));
-			}
+			write(serial_port, &serialData, sizeof(serialData));
 		}
 	}
 
